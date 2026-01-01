@@ -252,6 +252,124 @@ Context distillation is useful for **format/style transfer**, not **capability t
 
 ---
 
+## Cost Analysis
+
+### Experiment Duration
+
+| Experiment | Runs | Duration | Per Run |
+|------------|:----:|:--------:|:-------:|
+| Qwen (4B ← 30B) | 80 | 62.7h | 47 min |
+| Llama (8B ← 70B) | 80 | 67.7h | 51 min |
+| **Total** | **160** | **130.4h (5.4 days)** | **49 min avg** |
+
+### Compute Costs
+
+| Component | Qwen | Llama | Notes |
+|-----------|:----:|:-----:|-------|
+| Training hours | 62.7h | 67.7h | 100 steps/run (200 for extended) |
+| Cost/hour | ~$0.75 | ~$1.00 | Student training + teacher inference |
+| **Subtotal** | **~$47** | **~$68** | |
+| **Total** | | **~$115** | For 160 runs |
+
+### Per-Run Breakdown
+
+| Item | Qwen | Llama |
+|------|:----:|:-----:|
+| Training (100 steps) | ~$0.45 | ~$0.65 |
+| Downstream eval (50 questions) | ~$0.14 | ~$0.20 |
+| **Total per run** | **~$0.59** | **~$0.85** |
+
+### Cost Efficiency
+
+- **Cost per percentage point of accuracy**: ~$1.60 (Qwen), ~$0.96 (Llama)
+- **Best method (teacher_seeded)**: 10 seeds × ~$0.72 = **~$7.20** for statistical validity
+- **Full method comparison**: 8 methods × 10 seeds × $0.72 = **~$58** per model family
+
+---
+
+## Proposed Next Steps
+
+### Priority 1: Validate on More Benchmarks (~$50-80)
+
+Test teacher_seeded on additional reasoning benchmarks to verify generalization:
+
+| Benchmark | Questions | Est. Cost | Purpose |
+|-----------|:---------:|:---------:|---------|
+| MMLU (5-shot) | 100 | ~$15 | General knowledge retention |
+| ARC-Challenge | 50 | ~$10 | Scientific reasoning |
+| HellaSwag | 50 | ~$10 | Common sense |
+| HumanEval | 50 | ~$15 | Code generation |
+
+**Total**: ~$50-80 for 5 seeds per benchmark
+
+### Priority 2: Hyperparameter Optimization (~$100-150)
+
+The current teacher_seeded uses default hyperparameters. Potential improvements:
+
+| Parameter | Current | Range to Test | Est. Runs | Cost |
+|-----------|:-------:|:-------------:|:---------:|:----:|
+| Initial seed tokens | 20 | 10, 15, 25, 30 | 20 | ~$15 |
+| Seed decay steps | 50 | 30, 40, 60, 70 | 20 | ~$15 |
+| LoRA rank | 32 | 16, 64, 128 | 15 | ~$12 |
+| Learning rate | 3e-4 | 1e-4, 5e-4, 1e-3 | 15 | ~$12 |
+| Training steps | 100 | 150, 200, 300 | 15 | ~$20 |
+
+**Total**: ~$100-150 for systematic search (could improve accuracy 5-10%)
+
+### Priority 3: Scale to Larger Models (~$200-400)
+
+Test if the findings hold at larger scale:
+
+| Configuration | Student | Teacher | Est. Cost |
+|---------------|---------|---------|:---------:|
+| Llama 70B ← 405B | 70B | 405B | ~$150 |
+| Qwen 32B ← 72B | 32B | 72B | ~$100 |
+| Mistral 7B ← Mixtral | 7B | 8x7B MoE | ~$80 |
+
+**Total**: ~$200-400 for 3-5 seeds per config
+
+### Priority 4: Alternative Distillation Objectives (~$80-120)
+
+Test other on-policy objectives that might outperform GKD:
+
+| Method | Description | Est. Cost |
+|--------|-------------|:---------:|
+| DPO on teacher preferences | Teacher ranks student outputs | ~$40 |
+| Reward-weighted GKD | Weight by teacher confidence | ~$30 |
+| Multi-step reasoning distillation | Chain-of-thought specific | ~$50 |
+
+**Total**: ~$80-120 for 5 seeds per method
+
+### Priority 5: True Context Distillation (~$60-80)
+
+Revisit the original spec with lessons learned:
+
+| Setup | Configuration | Est. Cost |
+|-------|---------------|:---------:|
+| Few-shot → no context | Llama-8B with/without 5-shot | ~$30 |
+| RAG → no RAG | Distill retrieval knowledge | ~$50 |
+
+Use teacher_seeded approach instead of hybrid to avoid collapse.
+
+**Total**: ~$60-80
+
+---
+
+## Budget Summary
+
+| Priority | Focus | Cost | Expected Impact |
+|:--------:|-------|:----:|-----------------|
+| 1 | Benchmark validation | $50-80 | Verify generalization |
+| 2 | Hyperparameter tuning | $100-150 | +5-10% accuracy |
+| 3 | Scale testing | $200-400 | Publication-ready results |
+| 4 | Alternative objectives | $80-120 | Potential breakthrough |
+| 5 | True context distillation | $60-80 | Complete original spec |
+
+**Recommended minimum**: Priorities 1+2 = **~$150-230**
+**Full research program**: All priorities = **~$500-830**
+
+---
+
 ## Limitations
 
 1. **Benchmark scope**: Only tested on GSM8K math reasoning
